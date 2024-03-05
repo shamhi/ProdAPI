@@ -11,7 +11,6 @@ jobs:
     name: Build
     runs-on: cu-backend
     timeout-minutes: 10
-    if: github.actor != 'github-classroom[bot]'
     container:
       image: gcr.io/kaniko-project/executor:debug
     steps:
