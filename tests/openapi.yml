@@ -1,0 +1,987 @@
+openapi: "3.0.1"
+info:
+  title: Pulse API
+  version: "1.0"
+servers:
+  - url: http://localhost:8080/api
+paths:
+  /ping:
+    get:
+      summary: Проверка сервера на готовность принимать запросы
+      description: |
+        Данный эндпоинт позволяет понять, что сервер готов принимать входящие запросы.
+
+        Программа-чекер будет дожидаться первого успешного ответа от сервера на данный эндпоинт, после чего будет запускать проверку тестовый сценариев.
+      operationId: ping
+      responses:
+        "200":
+          description: |
+            Если сервер успешно отвечает на данный запрос, считается, что он готов обрабатывать входящие запросы в API. 
+
+            Содержимое ответа при этом не валидируется, можно возвращать "ok".
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+        "500":
+          description: Если сервер отвечает любым отличным от 200 кодом ответа, считается, что он не готов принимать запросы.
+  /countries:
+    get:
+      summary: Получить список стран
+      description: |
+        Получение списка стран с возможной фильтрацией.
+
+        Используется на странице регистрации для предоставления возможности выбора страны, к которой относится пользователь.
+        Если хотя бы один переданный регион является некорректным, весь запрос считается некорректным.
+
+        Если никакие из фильтров не переданы, необходимо вернуть все страны.
+      operationId: listCountries
+      parameters:
+        - name: region
+          description: |
+            Возвращаемые страны должны относиться только к тем регионам, которые переданы в данном списке.
+
+            Если передан пустой список, считайте, что фильтр по региону отсутствует.
+          in: query
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/countryRegion"
+            example:
+              - Europe
+              - Asia
+      responses:
+        "200":
+          description: Список стран, соответствующих указанному фильтру. Страны должны быть отсортированы лексикографически по двухбуквенному коду.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/country"
+        "400":
+          description: Формат входного запроса не соответствует формату либо переданы неверные значения.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /countries/{alpha2}:
+    get:
+      summary: Получить страну по alpha2 коду
+      description: |
+        Получение одной страны по её уникальному двухбуквенному коду.
+
+        Используется для получения информации по определенной стране.
+      operationId: getCountry
+      parameters:
+        - name: alpha2
+          description: |
+            Возвращаемая страна должна иметь указанный alpha2 код.
+          required: true
+          in: path
+          schema:
+            $ref: "#/components/schemas/countryAlpha2"
+      responses:
+        "200":
+          description: Страна, найденная по указанному коду.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/country"
+        "404":
+          description: Страна с указанным кодом не найдена.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /auth/register:
+    post:
+      summary: Регистрация нового пользователя
+      description: |
+        Используется для регистрации нового пользователя по логину и паролю.
+      operationId: authRegister
+      requestBody:
+        description: Данные для регистрации пользователя.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                login:
+                  $ref: "#/components/schemas/userLogin"
+                email:
+                  $ref: "#/components/schemas/userEmail"
+                password:
+                  $ref: "#/components/schemas/userPassword"
+                countryCode:
+                  $ref: "#/components/schemas/countryAlpha2"
+                isPublic:
+                  $ref: "#/components/schemas/userIsPublic"
+                phone:
+                  $ref: "#/components/schemas/userPhone"
+                image:
+                  $ref: "#/components/schemas/userImage"
+              required:
+                - login
+                - email
+                - password
+                - countryCode
+                - isPublic
+      responses:
+        "201":
+          description: В случае успеха возвращается профиль зарегистрированного пользователя
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile:
+                    $ref: "#/components/schemas/userProfile"
+                required:
+                  - profile
+        "400":
+          description: |
+            Регистрационные данные не соответствуют ожидаемому формату и требованиям. 
+
+            Например, данную ошибку необходимо возвращать в следующих ситуациях (это не полный список):
+
+            - Недостаточно "надежный" пароль.
+            - Страна с указанным кодом не найдена.
+            - Длина ссылки на аватар пользователя превышает допустимый лимит.
+
+            Для ознакомления с форматом и требованиями к регистрационным данным обратите внимание на описание моделей в Open API спецификации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+        "409":
+          description: |
+            Нарушено требование на уникальность авторизационных данных пользователей.
+
+            Данный код ответа должен использоваться, если пользователь с таким e-mail, номером телефона или логином уже зарегистрирован.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /auth/sign-in:
+    post:
+      summary: Аутентификация для получения токена
+      description: |
+        Процедура аутентификации по логину и паролю позволяет получить токен, который в дальнейшем будет использоваться пользователем для выполнения операций, требующих авторизацию.
+
+        Сервер должен генерировать уникальные токены, имеющие время жизни (на усмотрение разработчика, от 1 до 24 часов). После истечения времени действия токен должен быть недействительным и не может использоваться для аутентификации.
+
+        Токен является уникальным строковым значением с высокой энтропией (злоумышленник не сможет его "подобрать" перебором). При каждой новой аутентификации генерируется новый уникальный токен, который ранее не был использован. Можно использовать JWT.
+
+        В дальнейшем полученный токен будет использоваться для авторизации пользовательских запросов. Значение токена будет подставляться в заголовок `Authorization` в формате `Bearer {token}`. Следовательно, сервер должен уметь идентифицировать пользователя по токену.
+      operationId: authSignIn
+      requestBody:
+        description: Данные для аутентификации пользователя.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                login:
+                  $ref: "#/components/schemas/userLogin"
+                password:
+                  $ref: "#/components/schemas/userPassword"
+              required:
+                - login
+                - password
+      responses:
+        "200":
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Сгенерированный токен пользователя
+                    minLength: 20
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+                required:
+                  - token
+        "401":
+          description: Пользователь с указанным логином и паролем не найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /me/profile:
+    get:
+      summary: Получение собственного профиля
+      description: |
+        Используется для получения пользователем его собственного профиля.
+
+        Сервер должен идентифицировать пользователя по переданному токену. Значение токена будет подставляться в заголовок `Authorization` в формате `Bearer {token}`.
+      security:
+        - bearerAuth: []
+      operationId: getMyProfile
+      responses:
+        "200":
+          description: Передан действительный токен, в ответе возвращается профиль пользователя.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/userProfile"
+        "401":
+          description: Переданный токен не существует либо некорректен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+    patch:
+      summary: Редактирование собственного профиля
+      description: |
+        Используется для редактирования параметров профиля пользователя.
+
+        Сервер должен идентифицировать пользователя по переданному токену. Значение токена будет подставляться в заголовок `Authorization` в формате `Bearer {token}`.
+      security:
+        - bearerAuth: []
+      operationId: patchMyProfile
+      requestBody:
+        description: |
+          В теле запроса перечисляются названия параметров, которые необходимо обновить, и новые значения.
+
+          Если значение передано, данное изменение должно быть отражено в профиле пользователя.
+          Если значение не передано, необходимо оставить прежнее значение параметра.
+          Если передана пустая структура, ничего изменять не требуется, возвращается успешный ответ.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                countryCode:
+                  $ref: "#/components/schemas/countryAlpha2"
+                isPublic:
+                  $ref: "#/components/schemas/userIsPublic"
+                phone:
+                  $ref: "#/components/schemas/userPhone"
+                image:
+                  $ref: "#/components/schemas/userImage"
+      responses:
+        "200":
+          description: Передан действительный токен, в ответе возвращается профиль пользователя с примененными изменениями.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/userProfile"
+        "401":
+          description: Переданный токен не существует либо некорректен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+        "400":
+          description: |
+            Данные не соответствуют ожидаемому формату и требованиям. 
+
+            Например, данную ошибку необходимо возвращать в следующих ситуациях (это не полный список):
+
+            - Страна с указанным кодом не найдена.
+            - Длина ссылки на аватар пользователя превышает допустимый лимит.
+
+            Для ознакомления с форматом и требованиями к регистрационным данным обратите внимание на описание моделей в Open API спецификации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+        "409":
+          description: |
+            Нарушено требование на уникальность авторизационных данных пользователей.
+
+            Данный код ответа должен использоваться, если указанный номер телефона занят другим пользователем.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /profiles/{login}:
+    get:
+      summary: Получение профиля пользователя по логину
+      description: |
+        Используется для получения профиля другого пользователя по логину.
+
+        Если профиль пользователя публичен (`isPublic: true`), его может получить любой другой пользователь. Если профиль пользователя закрыт, его могут получить пользователи, которых данный пользователь добавил в друзья.
+
+        При этом собственный профиль пользователь может получить всегда. Сервер должен идентифицировать пользователя по переданному токену в заголовке `Authorization`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: login
+          description: Логин пользователя, чей профиль необходимо получить.
+          required: true
+          in: path
+          schema:
+            $ref: "#/components/schemas/userLogin"
+      operationId: getProfile
+      responses:
+        "200":
+          description: Пользователь с указанным логином существует и его профиль может быть получен пользователем, осуществившим запрос.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/userProfile"
+        "401":
+          description: Переданный токен не существует либо некорректен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+        "403":
+          description: |
+            Профиль не может быть получен: либо пользователь с указанным логином не существует, либо у отправителя запроса нет доступа к запрашиваемому профилю.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /me/updatePassword:
+    post:
+      summary: Обновление пароля
+      description: |
+        Используется для обновления пароля.
+
+        Сервер должен идентифицировать пользователя по переданному токену. Значение токена будет подставляться в заголовок `Authorization` в формате `Bearer {token}`.
+
+        Важно: после успешного обновления пароля ранее выписанные токены должны быть деактивированы. Как только сервер вернет успешный ответ на данный запрос, пользователь не сможет совершить какие-либо операции с ранее созданными токенами (запросы со старыми токенами должны получать соответствующий ошибочный статус код).
+      security:
+        - bearerAuth: []
+      operationId: updatePassword
+      requestBody:
+        description: |
+          В теле запроса передается старый и новый пароли. Пароль может быть обновлен только в случае передачи правильного значения старого пароля.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                oldPassword:
+                  $ref: "#/components/schemas/userPassword"
+                newPassword:
+                  $ref: "#/components/schemas/userPassword"
+              required:
+                - oldPassword
+                - newPassword
+      responses:
+        "200":
+          description: Пароль успешно обновлен и ранее выпущенные токены отозваны.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Должно принимать значение `ok`.
+                    example: ok
+                required:
+                  - status
+        "400":
+          description: Новый пароль не соответствует требованиям безопасности.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+        "401":
+          description: Переданный токен не существует либо некорректен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+        "403":
+          description: Указанный пароль не совпадает с действительным.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /friends/add:
+    post:
+      summary: Добавить пользователя в друзья
+      description: |
+        Позволяет добавить другого пользователя к себе в друзья.
+
+        Если указанный пользователь уже добавлен в друзья, верните успешный ответ.
+        Если пользователь добавляет в друзья самого себя, верните успешный ответ (добавлять в друзья при этом не нужно).
+
+        Сервер должен идентифицировать пользователя по переданному токену. Значение токена будет подставляться в заголовок `Authorization` в формате `Bearer {token}`.
+      security:
+        - bearerAuth: []
+      operationId: friendsAdd
+      requestBody:
+        description: |
+          В теле запроса передается логин пользователя.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                login:
+                  $ref: "#/components/schemas/userLogin"
+              required:
+                - login
+      responses:
+        "200":
+          description: Операция завершилась успешно.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Должно принимать значение `ok`.
+                    example: ok
+                required:
+                  - status
+        "401":
+          description: Переданный токен не существует либо некорректен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+        "404":
+          description: Пользователь с указанным логином не найден.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /friends/remove:
+    post:
+      summary: Удалить пользователя из друзей
+      description: |
+        Позволяет удалить пользователя из друзей.
+
+        Если указанного пользователя нет в друзьях, верните успешный ответ.
+
+        Сервер должен идентифицировать пользователя по переданному токену. Значение токена будет подставляться в заголовок `Authorization` в формате `Bearer {token}`.
+      security:
+        - bearerAuth: []
+      operationId: friendsRemove
+      requestBody:
+        description: |
+          В теле запроса передается логин пользователя.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                login:
+                  $ref: "#/components/schemas/userLogin"
+              required:
+                - login
+      responses:
+        "200":
+          description: Операция завершилась успешно.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Должно принимать значение `ok`.
+                    example: ok
+                required:
+                  - status
+        "401":
+          description: Переданный токен не существует либо некорректен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /friends:
+    get:
+      summary: Получение списка друзей
+      description: |
+        Используется для получения списка своих друзей (пользователей, кого инициатор запроса добавил в друзья).
+
+        Для плавной работы приложения используется пагинация.
+
+        Сервер должен идентифицировать пользователя по переданному токену. Значение токена будет подставляться в заголовок `Authorization` в формате `Bearer {token}`.
+      security:
+        - bearerAuth: []
+      operationId: friendsList
+      parameters:
+        - $ref: "#/components/parameters/paginationLimit"
+        - $ref: "#/components/parameters/paginationOffset"
+      responses:
+        "200":
+          description: |
+            Список друзей пользователя, отсортированный по убыванию по дате последнего добавления в друзья.
+
+            В начале идут друзья, которые были добавлены совсем недавно.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  description: Описание друга.
+                  properties:
+                    login:
+                      $ref: "#/components/schemas/userLogin"
+                    addedAt:
+                      type: string
+                      description: |
+                        Время и дата, когда данный пользователь был добавлен в друзья в последний раз.
+
+                        Передается в формате RFC3339.
+                      example: 2006-01-02T15:04:05Z07:00
+                  required:
+                    - login
+                    - addedAt
+        "401":
+          description: Переданный токен не существует либо некорректен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /posts/new:
+    post:
+      summary: Отправить публикацию
+      description: |
+        Используется для отправки публикации в ленту.
+
+        Сервер должен идентифицировать пользователя по переданному токену. Значение токена будет подставляться в заголовок `Authorization` в формате `Bearer {token}`.
+      security:
+        - bearerAuth: []
+      operationId: submitPost
+      requestBody:
+        description: Информация о публикации.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  $ref: "#/components/schemas/postContent"
+                tags:
+                  $ref: "#/components/schemas/postTags"
+              required:
+                - content
+                - tags
+      responses:
+        "200":
+          description: Публикация сохранена. Сервер назначает уникальный идентификатор и время создания публикации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/post"
+        "401":
+          description: Переданный токен не существует либо некорректен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /posts/{postId}:
+    get:
+      summary: Получить публикацию по ID
+      description: |
+        Используется для получения публикации по её идентификатору.
+
+        Если публикация принадлежит пользователю с публичным профилем, её может получить любой другой аутентифицированный пользователь.
+
+        Если профиль автора закрыт, она доступна автору и пользователям, кого автор добавил в друзья.
+
+        Сервер должен идентифицировать пользователя по переданному токену. Значение токена будет подставляться в заголовок `Authorization` в формате `Bearer {token}`.
+      security:
+        - bearerAuth: []
+      operationId: getPostById
+      parameters:
+        - name: postId
+          description: ID публикации.
+          required: true
+          in: path
+          schema:
+            $ref: "#/components/schemas/postId"
+      responses:
+        "200":
+          description: Публикация найдена.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/post"
+        "401":
+          description: Переданный токен не существует либо некорректен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+        "404":
+          description: Указанный пост не найден либо к нему нет доступа.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /posts/feed/my:
+    get:
+      summary: Получить ленту со своими постами
+      description: |
+        Используется для получения списка своих постов.
+
+        Для плавной работы приложения используется пагинация.
+
+        Можете считать, что пользователей с логином `my` не будет.
+
+        Сервер должен идентифицировать пользователя по переданному токену. Значение токена будет подставляться в заголовок `Authorization` в формате `Bearer {token}`.
+      security:
+        - bearerAuth: []
+      operationId: getMyFeed
+      parameters:
+        - $ref: "#/components/parameters/paginationLimit"
+        - $ref: "#/components/parameters/paginationOffset"
+      responses:
+        "200":
+          description: |
+            Список публикаций пользователя, отсортированных по убыванию по дате публикации.
+
+            В начале идут публикации, которые были добавлены совсем недавно.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/post"
+        "401":
+          description: Переданный токен не существует либо некорректен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /posts/feed/{login}:
+    get:
+      summary: Получить ленту с постами другого пользователя
+      description: |
+        Используется для получения списка публикаций другого пользователя.
+
+        Если профиль пользователя открыт, его посты доступны всем.
+        Если профиль пользователя закрыт, его посты доступны самому пользователю и пользователям, кого он добавил в друзья.
+
+        Для плавной работы приложения используется пагинация.
+
+        Сервер должен идентифицировать пользователя по переданному токену. Значение токена будет подставляться в заголовок `Authorization` в формате `Bearer {token}`.
+      security:
+        - bearerAuth: []
+      operationId: getFeedByOthers
+      parameters:
+        - name: login
+          description: Логин пользователя.
+          required: true
+          in: path
+          schema:
+            $ref: "#/components/schemas/userLogin"
+        - $ref: "#/components/parameters/paginationLimit"
+        - $ref: "#/components/parameters/paginationOffset"
+      responses:
+        "200":
+          description: |
+            Список публикаций пользователя, отсортированных по убыванию по дате публикации.
+
+            В начале идут публикации, которые были добавлены совсем недавно.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/post"
+        "401":
+          description: Переданный токен не существует либо некорректен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+        "404":
+          description: Пользователь не найден либо к нему нет доступа.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /posts/{postId}/like:
+    post:
+      summary: Лайк поста
+      description: |
+        Лайк поста.
+
+        Сервер должен идентифицировать пользователя по переданному токену. Значение токена будет подставляться в заголовок `Authorization` в формате `Bearer {token}`.
+      security:
+        - bearerAuth: []
+      operationId: likstPost
+      parameters:
+        - name: postId
+          description: ID публикации.
+          required: true
+          in: path
+          schema:
+            $ref: "#/components/schemas/postId"
+      responses:
+        "200":
+          description: Реакция засчитана, возвращайте пубикацию с актуальным числом лайков и дизлайков.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/post"
+        "401":
+          description: Переданный токен не существует либо некорректен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+        "404":
+          description: Указанный пост не найден либо к нему нет доступа.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+  /posts/{postId}/dislike:
+    post:
+      summary: Дизлайк поста
+      description: |
+        Дизлайк поста.
+
+        Сервер должен идентифицировать пользователя по переданному токену. Значение токена будет подставляться в заголовок `Authorization` в формате `Bearer {token}`.
+      security:
+        - bearerAuth: []
+      operationId: dislikePost
+      parameters:
+        - name: postId
+          description: ID публикации.
+          required: true
+          in: path
+          schema:
+            $ref: "#/components/schemas/postId"
+      responses:
+        "200":
+          description: Реакция засчитана, возвращайте пубикацию с актуальным числом лайков и дизлайков.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/post"
+        "401":
+          description: Переданный токен не существует либо некорректен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+        "404":
+          description: Указанный пост не найден либо к нему нет доступа.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/errorResponse"
+
+components:
+  schemas:
+    countryAlpha2:
+      type: string
+      description: Двухбуквенный код, уникально идентифицирующий страну
+      maxLength: 2
+      pattern: "[a-zA-Z]{2}"
+      example: RU
+    countryRegion:
+      type: string
+      description: Географический регион, к которому относится страна
+      enum:
+        - Europe
+        - Africa
+        - Americas
+        - Oceania
+        - Asia
+    country:
+      type: object
+      description: Информация о стране из стандарта ISO 3166
+      properties:
+        name:
+          type: string
+          description: Полное название страны
+          maxLength: 100
+        alpha2:
+          $ref: "#/components/schemas/countryAlpha2"
+        alpha3:
+          type: string
+          description: Трехбуквенный код страны
+          maxLength: 3
+          pattern: "[a-zA-Z]{3}"
+        region:
+          $ref: "#/components/schemas/countryRegion"
+      required:
+        - name
+        - alpha2
+        - alpha3
+      example:
+        name: Burkina Faso
+        alpha2: BF
+        alpha3: BFA
+        region: Africa
+    userLogin:
+      type: string
+      description: Логин пользователя
+      maxLength: 30
+      pattern: "[a-zA-Z0-9-]+"
+      example: yellowMonkey
+    userEmail:
+      type: string
+      description: E-mail пользователя
+      maxLength: 50
+      minLength: 1
+      example: yellowstone1980@you.ru
+    userPassword:
+      type: string
+      description: |
+        Пароль пользователя, к которому предъявляются следующие требования:
+
+        - Длина пароля не менее 6 символов.
+        - Присутствуют латинские символы в нижнем и верхнем регистре.
+        - Присутствует минимум одна цифра.
+      minLength: 6
+      maxLength: 100
+      example: $aba4821FWfew01#.fewA$
+    userIsPublic:
+      type: boolean
+      description: |
+        Является ли данный профиль публичным. 
+
+        Публичные профили доступны другим пользователям: если профиль публичный, любой пользователь платформы сможет получить информацию о пользователе.
+      example: true
+    userPhone:
+      type: string
+      description: Номер телефона пользователя в формате +123456789
+      pattern: \+[\d]+
+      example: "+74951239922"
+      maxLength: 20
+    userImage:
+      type: string
+      description: Ссылка на фото для аватара пользователя
+      example: https://http.cat/images/100.jpg
+      maxLength: 200
+      minLength: 1
+    userProfile:
+      type: object
+      description: Информация о профиле пользователя
+      properties:
+        login:
+          $ref: "#/components/schemas/userLogin"
+        email:
+          $ref: "#/components/schemas/userEmail"
+        countryCode:
+          $ref: "#/components/schemas/countryAlpha2"
+        isPublic:
+          $ref: "#/components/schemas/userIsPublic"
+        phone:
+          $ref: "#/components/schemas/userPhone"
+        image:
+          $ref: "#/components/schemas/userImage"
+      required:
+        - login
+        - email
+        - countryCode
+        - isPublic
+    postId:
+      type: string
+      description: Уникальный идентификатор публикации, присвоенный сервером.
+      example: 550e8400-e29b-41d4-a716-446655440000
+      maxLength: 100
+    postContent:
+      type: string
+      description: Текст публикации.
+      example: Свеча на 400! Покупаем, докупаем и фиксируем прибыль.
+      maxLength: 1000
+    postTags:
+      type: array
+      description: Список тегов публикации.
+      items:
+        type: string
+        description: Значение тега.
+        example: тинькофф
+        maxLength: 20
+      example:
+        - тинькофф
+        - спббиржа
+        - moex
+    post:
+      type: object
+      description: Пользовательская публикация.
+      properties:
+        id:
+          $ref: "#/components/schemas/postId"
+        content:
+          $ref: "#/components/schemas/postContent"
+        author:
+          $ref: "#/components/schemas/userLogin"
+        tags:
+          $ref: "#/components/schemas/postTags"
+        createdAt:
+          type: string
+          description: |
+            Серверная дата и время в момент, когда пользователь отправил данную публикацию.
+            Передается в формате RFC3339.
+          example: 2006-01-02T15:04:05Z07:00
+        likesCount:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Число лайков, набранное публикацией.
+        dislikesCount:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Число дизлайков, набранное публикацией.
+      required:
+        - id
+        - content
+        - author
+        - tags
+        - createdAt
+        - likesCount
+        - dislikesCount
+    errorResponse:
+      type: object
+      description: Используется для возвращения ошибки пользователю
+      properties:
+        reason:
+          type: string
+          description: Описание ошибки в свободной форме
+          minLength: 5
+      required:
+        - reason
+      example:
+        reason: <объяснение, почему запрос пользователя не может быть обработан>
+  parameters:
+    paginationLimit:
+      in: query
+      name: limit
+      required: false
+      description: |
+        Максимальное число возвращаемых объектов. Используется для запросов с пагинацией.
+
+        Сервер должен возвращать максимальное допустимое число объектов.
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        maximum: 50
+        default: 5
+    paginationOffset:
+      in: query
+      name: offset
+      required: false
+      description: |
+        Какое количество объектов должно быть пропущено с начала. Используется для запросов с пагинацией.
+      schema:
+        type: integer
+        format: int32
+        default: 0
+        minimum: 0
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer

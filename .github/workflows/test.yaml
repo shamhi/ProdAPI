@@ -1,0 +1,72 @@
+name: Run tests
+
+on: deployment
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Build
+    runs-on: cu-backend
+    timeout-minutes: 10
+    if: github.actor != 'github-classroom[bot]'
+    container:
+      image: gcr.io/kaniko-project/executor:debug
+    steps:
+      - name: Login to ghcr.io
+        run: >
+          echo "{\"auths\": {\"ghcr.io\": {\"auth\": \"$(echo -n "$AUTH" | base64 -w 0)\"}}}"
+          > /kaniko/.docker/config.json
+        env:
+          AUTH: "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Build solution image
+        run: >
+          /kaniko/executor
+          --context="${{ github.repositoryUrl }}#refs/heads/main#${{ github.sha }}"
+          --context-sub-path=solution
+          --destination="$(echo -n "$REPO:run-${{ github.run_id }}" | tr '[:upper:]' '[:lower:]')"
+          --destination="$(echo -n "$REPO:latest" | tr '[:upper:]' '[:lower:]')"
+          --label org.opencontainers.image.source=https://github.com/${{ github.repository }}
+        env:
+          GIT_USERNAME: kaniko
+          GIT_PASSWORD: "${{ secrets.GITHUB_TOKEN }}"
+          REPO: "ghcr.io/${{ github.repository }}"
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-22.04
+    needs: build
+    timeout-minutes: 10
+    if: github.actor != 'github-classroom[bot]'
+    steps:
+      - uses: Central-University-IT/setup-test-backend@v1
+
+      - uses: docker/login-action@v3.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: >
+          IMAGE_SOLUTION="$(echo "ghcr.io/${{ github.repository }}:run-${{ github.run_id }}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE_POSTGRES="$(echo "ghcr.io/${{ github.repository_owner }}/postgres:16.1-alpine3.19" | tr '[:upper:]' '[:lower:]')"
+          /usr/local/bin/checker
+        continue-on-error: true
+
+      - uses: actions/upload-artifact@v4.0.0
+        with:
+          name: result
+          path: ./result.json
+          if-no-files-found: error
+          compression-level: 0
+
+      - uses: bots-house/ghcr-delete-image-action@v1.1.0
+        continue-on-error: true
+        with:
+          owner: ${{ github.repository_owner }}
+          name: ${{ github.event.repository.name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: run-${{ github.run_id }}

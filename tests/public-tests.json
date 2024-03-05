@@ -1,0 +1,889 @@
+{
+	"info": {
+		"_postman_id": "a5dbb75a-d7a8-4e8c-8660-9925345a3a86",
+		"name": "PROD round 2: public tests [1]",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "01/ping",
+			"item": [
+				{
+					"name": "Ping",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"",
+									"pm.test(\"PING server\", function () {",
+									"    pm.sendRequest(pm.variables.get(\"base_url\") + \"/ping\", function (err, response) {",
+									"        pm.expect(response.code).to.be.eq(200, \"Invalid response code status\");",
+									"    });",
+									"});",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "02/countries",
+			"item": [
+				{
+					"name": "List countries",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var schema = {",
+									"  \"type\": \"array\",",
+									"  \"items\": {",
+									"    \"type\": \"object\",",
+									"    \"description\": \"Информация о стране из стандарта ISO 3166\",",
+									"    \"properties\": {",
+									"      \"name\": {",
+									"        \"type\": \"string\",",
+									"        \"description\": \"Полное название страны\",",
+									"        \"maxLength\": 100",
+									"      },",
+									"      \"alpha2\": {",
+									"        \"type\": \"string\",",
+									"        \"description\": \"Двухбуквенный код, уникально идентифицирующий страну\",",
+									"        \"maxLength\": 2,",
+									"        \"pattern\": \"[a-zA-Z]{2}\"",
+									"      },",
+									"      \"alpha3\": {",
+									"        \"type\": \"string\",",
+									"        \"description\": \"Трехбуквенный код страны\",",
+									"        \"maxLength\": 3,",
+									"        \"pattern\": \"[a-zA-Z]{3}\"",
+									"      },",
+									"      \"region\": {",
+									"        \"type\": \"string\",",
+									"        \"description\": \"Географический регион, к которому относится страна\",",
+									"        \"enum\": [",
+									"          \"Europe\",",
+									"          \"Africa\",",
+									"          \"Americas\",",
+									"          \"Oceania\",",
+									"          \"Asia\"",
+									"        ]",
+									"      }",
+									"    },",
+									"    \"required\": [",
+									"      \"name\",",
+									"      \"alpha2\",",
+									"      \"alpha3\"",
+									"    ]",
+									"  },",
+									"  \"$schema\": \"http://json-schema.org/draft-04/schema#\"",
+									"};",
+									"",
+									"var countries = [",
+									"    {",
+									"        \"name\": \"Algeria\",",
+									"        \"alpha2\": \"DZ\",",
+									"        \"alpha3\": \"DZA\",",
+									"        \"region\": \"Africa\"",
+									"    },",
+									"    {",
+									"        \"name\": \"Russian Federation\",",
+									"        \"alpha2\": \"RU\",",
+									"        \"alpha3\": \"RUS\",",
+									"        \"region\": \"Europe\"",
+									"    },",
+									"];",
+									"",
+									"countries.forEach(function (country) {",
+									"    pm.test(`List countries from region \"${country.region}\"`, function () {",
+									"        var url = pm.variables.get(\"base_url\") + `/countries?region=${country.region}`;",
+									"",
+									"        pm.sendRequest(url, function (err, response) {",
+									"            pm.test(`Validate response for region ${country.region}`, () => {",
+									"                var resp = response.json();",
+									"            ",
+									"                pm.expect(response.code).to.be.eq(200, \"Invalid response code status\");",
+									"                pm.expect(tv4.validate(resp, schema), \"Invalid JSON schema\").to.be.true;",
+									"",
+									"                console.log(\"got\", resp);",
+									"                pm.expect(resp).to.deep.include(country, `Invalid countries list`);",
+									"            });",
+									"        });",
+									"    });",
+									"});",
+									"",
+									"",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/countries",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"countries"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get country",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var countrySchema = {",
+									"  \"type\": \"object\",",
+									"  \"description\": \"Информация о стране из стандарта ISO 3166\",",
+									"  \"properties\": {",
+									"    \"name\": {",
+									"      \"type\": \"string\",",
+									"      \"description\": \"Полное название страны\",",
+									"      \"maxLength\": 100",
+									"    },",
+									"    \"alpha2\": {",
+									"      \"type\": \"string\",",
+									"      \"description\": \"Двухбуквенный код, уникально идентифицирующий страну\",",
+									"      \"maxLength\": 2,",
+									"      \"pattern\": \"[a-zA-Z]{2}\"",
+									"    },",
+									"    \"alpha3\": {",
+									"      \"type\": \"string\",",
+									"      \"description\": \"Трехбуквенный код страны\",",
+									"      \"maxLength\": 3,",
+									"      \"pattern\": \"[a-zA-Z]{3}\"",
+									"    },",
+									"    \"region\": {",
+									"      \"type\": \"string\",",
+									"      \"description\": \"Географический регион, к которому относится страна\",",
+									"      \"enum\": [",
+									"        \"Europe\",",
+									"        \"Africa\",",
+									"        \"Americas\",",
+									"        \"Oceania\",",
+									"        \"Asia\"",
+									"      ]",
+									"    }",
+									"  },",
+									"  \"required\": [",
+									"    \"name\",",
+									"    \"alpha2\",",
+									"    \"alpha3\"",
+									"  ],",
+									"  \"$schema\": \"http://json-schema.org/draft-04/schema#\"",
+									"};",
+									"",
+									"var countries = [",
+									"    {",
+									"        \"name\": \"Algeria\",",
+									"        \"alpha2\": \"DZ\",",
+									"        \"alpha3\": \"DZA\",",
+									"        \"region\": \"Africa\"",
+									"    },",
+									"    {",
+									"        \"name\": \"Russian Federation\",",
+									"        \"alpha2\": \"RU\",",
+									"        \"alpha3\": \"RUS\",",
+									"        \"region\": \"Europe\"",
+									"    },",
+									"    {",
+									"        \"name\": \"Kazakhstan\",",
+									"        \"alpha2\": \"KZ\",",
+									"        \"alpha3\": \"KAZ\",",
+									"        \"region\": \"Asia\"",
+									"    }",
+									"];",
+									"",
+									"countries.forEach(function (country) {",
+									"    pm.test(`Get country \"${country.name}\" [existing]`, function () {",
+									"        var url = pm.variables.get(\"base_url\") + \"/countries/\" + country.alpha2;",
+									"",
+									"        pm.sendRequest(url, function (err, response) {",
+									"            pm.test(\"Validate response\", () => {",
+									"                var resp = response.json();",
+									"",
+									"                pm.expect(response.code).to.be.eq(200, \"Invalid response code status\");",
+									"                pm.expect(tv4.validate(resp, countrySchema), \"Invalid JSON schema\").to.be.true;",
+									"",
+									"                console.log(\"got\", resp, \"expected\", country);",
+									"                pm.expect(resp).to.deep.eq(country, `Got invalid object`);",
+									"            });",
+									"        });",
+									"    });",
+									"});",
+									"",
+									"",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/countries/RU",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"countries",
+								"RU"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "03/auth/registration",
+			"item": [
+				{
+					"name": "Register a user",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var schema = {",
+									"  \"type\": \"object\",",
+									"  \"properties\": {",
+									"    \"profile\": {",
+									"      \"type\": \"object\",",
+									"      \"description\": \"Информация о профиле пользователя\",",
+									"      \"properties\": {",
+									"        \"login\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"Логин пользователя\",",
+									"          \"maxLength\": 30,",
+									"          \"pattern\": \"[a-zA-Z0-9-]+\"",
+									"        },",
+									"        \"email\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"E-mail пользователя\",",
+									"          \"maxLength\": 50",
+									"        },",
+									"        \"countryCode\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"Двухбуквенный код, уникально идентифицирующий страну\",",
+									"          \"maxLength\": 2,",
+									"          \"pattern\": \"[a-zA-Z]{2}\"",
+									"        },",
+									"        \"isPublic\": {",
+									"          \"type\": \"boolean\",",
+									"          \"description\": \"Является ли данный профиль публичным. \\n\\nПубличные профили доступны другим пользователям: если профиль публичный, любой пользователь платформы сможет получить информацию о пользователе.\\n\"",
+									"        },",
+									"        \"phone\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"Номер телефона пользователя в формате +123456789\",",
+									"          \"pattern\": \"\\\\+[\\\\d]+\"",
+									"        },",
+									"        \"image\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"Ссылка на фото для аватара пользователя\",",
+									"          \"maxLength\": 200",
+									"        }",
+									"      },",
+									"      \"required\": [",
+									"        \"login\",",
+									"        \"email\",",
+									"        \"countryCode\",",
+									"        \"isPublic\"",
+									"      ]",
+									"    }",
+									"  },",
+									"  \"required\": [",
+									"    \"profile\"",
+									"  ],",
+									"  \"$schema\": \"http://json-schema.org/draft-04/schema#\"",
+									"};",
+									"",
+									"pm.test(\"Register a user\", function () {",
+									"    var url = pm.variables.get(\"base_url\") + \"/auth/register\";",
+									"    const options = {",
+									"        url: url,",
+									"        method: 'POST',",
+									"        header: {",
+									"            'Content-Type': 'application/json',",
+									"        },",
+									"        body: {",
+									"            mode: 'raw',",
+									"            raw: JSON.stringify({",
+									"                'login': 'yellowMonkey2',",
+									"                'email': 'yellowstone1980@you.ru',",
+									"                'password': '$aba4821FWfew01#.fewA$',",
+									"                'countryCode': 'RU',",
+									"                'isPublic': true,",
+									"                'phone': '+74951239922',",
+									"            })",
+									"        }",
+									"    };",
+									"",
+									"    const profile = {",
+									"        'profile': {",
+									"            'login': 'yellowMonkey2',",
+									"            'email': 'yellowstone1980@you.ru',",
+									"            'countryCode': 'RU',",
+									"            'isPublic': true,",
+									"            'phone': '+74951239922',",
+									"        }",
+									"    }",
+									"",
+									"    pm.sendRequest(options, function (err, response) {",
+									"        pm.test(\"Validate response\", () => {",
+									"            var resp = response.json();",
+									"        ",
+									"            pm.expect(response.code).to.be.eq(201, \"Invalid response code status\");",
+									"            pm.expect(tv4.validate(resp, schema), \"Invalid JSON schema\").to.be.true;",
+									"",
+									"            console.log(\"got\", resp, \"expected\", profile);",
+									"            pm.expect(resp).to.deep.eq(profile, `Got invalid object`);",
+									"        });",
+									"    });",
+									"});",
+									"",
+									"",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "04/auth/sign-in",
+			"item": [
+				{
+					"name": "Register a user",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var schema = {",
+									"  \"type\": \"object\",",
+									"  \"properties\": {",
+									"    \"profile\": {",
+									"      \"type\": \"object\",",
+									"      \"description\": \"Информация о профиле пользователя\",",
+									"      \"properties\": {",
+									"        \"login\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"Логин пользователя\",",
+									"          \"maxLength\": 30,",
+									"          \"pattern\": \"[a-zA-Z0-9-]+\"",
+									"        },",
+									"        \"email\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"E-mail пользователя\",",
+									"          \"maxLength\": 50",
+									"        },",
+									"        \"countryCode\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"Двухбуквенный код, уникально идентифицирующий страну\",",
+									"          \"maxLength\": 2,",
+									"          \"pattern\": \"[a-zA-Z]{2}\"",
+									"        },",
+									"        \"isPublic\": {",
+									"          \"type\": \"boolean\",",
+									"          \"description\": \"Является ли данный профиль публичным. \\n\\nПубличные профили доступны другим пользователям: если профиль публичный, любой пользователь платформы сможет получить информацию о пользователе.\\n\"",
+									"        },",
+									"        \"phone\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"Номер телефона пользователя в формате +123456789\",",
+									"          \"pattern\": \"\\\\+[\\\\d]+\"",
+									"        },",
+									"        \"image\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"Ссылка на фото для аватара пользователя\",",
+									"          \"maxLength\": 200",
+									"        }",
+									"      },",
+									"      \"required\": [",
+									"        \"login\",",
+									"        \"email\",",
+									"        \"countryCode\",",
+									"        \"isPublic\"",
+									"      ]",
+									"    }",
+									"  },",
+									"  \"required\": [",
+									"    \"profile\"",
+									"  ],",
+									"  \"$schema\": \"http://json-schema.org/draft-04/schema#\"",
+									"};",
+									"",
+									"pm.test(\"Register a user\", function () {",
+									"    var url = pm.variables.get(\"base_url\") + \"/auth/register\";",
+									"    const options = {",
+									"        url: url,",
+									"        method: 'POST',",
+									"        header: {",
+									"            'Content-Type': 'application/json',",
+									"        },",
+									"        body: {",
+									"            mode: 'raw',",
+									"            raw: JSON.stringify({",
+									"                'login': 'yellowMonkey2',",
+									"                'email': 'yellowstone1980@you.ru',",
+									"                'password': '$aba4821FWfew01#.fewA$',",
+									"                'countryCode': 'RU',",
+									"                'isPublic': true,",
+									"                'phone': '+74951239922',",
+									"            })",
+									"        }",
+									"    };",
+									"",
+									"    const profile = {",
+									"        'profile': {",
+									"            'login': 'yellowMonkey2',",
+									"            'email': 'yellowstone1980@you.ru',",
+									"            'countryCode': 'RU',",
+									"            'isPublic': true,",
+									"            'phone': '+74951239922',",
+									"        }",
+									"    }",
+									"",
+									"    pm.sendRequest(options, function (err, response) {",
+									"        pm.test(\"Validate response\", () => {",
+									"            var resp = response.json();",
+									"        ",
+									"            pm.expect(response.code).to.be.oneOf([201, 409], \"Invalid response code status\");",
+									"            pm.expect(tv4.validate(resp, schema), \"Invalid JSON schema\").to.be.true;",
+									"",
+									"            console.log(\"got\", resp, \"expected\", profile);",
+									"            pm.expect(resp).to.deep.eq(profile, `Got invalid object`);",
+									"        });",
+									"    });",
+									"});",
+									"",
+									"",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Sign in",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var schema = {",
+									"  \"type\": \"object\",",
+									"  \"properties\": {",
+									"    \"token\": {",
+									"        \"type\": \"string\",",
+									"        \"description\": \"Сгенерированный токен пользователя\",",
+									"        \"minLength\": 20,",
+									"    }",
+									"  },",
+									"  \"required\": [",
+									"    \"token\"",
+									"  ],",
+									"  \"$schema\": \"http://json-schema.org/draft-04/schema#\"",
+									"};",
+									"",
+									"pm.test(\"Sign in\", function () {",
+									"    var url = pm.variables.get(\"base_url\") + \"/auth/sign-in\";",
+									"    const options = {",
+									"        url: url,",
+									"        method: 'POST',",
+									"        header: {",
+									"            'Content-Type': 'application/json',",
+									"        },",
+									"        body: {",
+									"            mode: 'raw',",
+									"            raw: JSON.stringify({",
+									"                'login': 'yellowMonkey2',",
+									"                'password': '$aba4821FWfew01#.fewA$',",
+									"            })",
+									"        }",
+									"    };",
+									"",
+									"    pm.sendRequest(options, function (err, response) {",
+									"        pm.test(\"Validate sign-in response\", () => {",
+									"            var resp = response.json();",
+									"",
+									"            pm.expect(response.code).to.be.eq(200, \"Invalid response code status\");",
+									"            pm.expect(tv4.validate(resp, schema), \"Invalid JSON schema\").to.be.true;",
+									"",
+									"            console.log('Token', resp.token);",
+									"        });",
+									"    });",
+									"});",
+									"",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "05/me",
+			"item": [
+				{
+					"name": "Register a user",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var schema = {",
+									"  \"type\": \"object\",",
+									"  \"properties\": {",
+									"    \"profile\": {",
+									"      \"type\": \"object\",",
+									"      \"description\": \"Информация о профиле пользователя\",",
+									"      \"properties\": {",
+									"        \"login\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"Логин пользователя\",",
+									"          \"maxLength\": 30,",
+									"          \"pattern\": \"[a-zA-Z0-9-]+\"",
+									"        },",
+									"        \"email\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"E-mail пользователя\",",
+									"          \"maxLength\": 50",
+									"        },",
+									"        \"countryCode\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"Двухбуквенный код, уникально идентифицирующий страну\",",
+									"          \"maxLength\": 2,",
+									"          \"pattern\": \"[a-zA-Z]{2}\"",
+									"        },",
+									"        \"isPublic\": {",
+									"          \"type\": \"boolean\",",
+									"          \"description\": \"Является ли данный профиль публичным. \\n\\nПубличные профили доступны другим пользователям: если профиль публичный, любой пользователь платформы сможет получить информацию о пользователе.\\n\"",
+									"        },",
+									"        \"phone\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"Номер телефона пользователя в формате +123456789\",",
+									"          \"pattern\": \"\\\\+[\\\\d]+\"",
+									"        },",
+									"        \"image\": {",
+									"          \"type\": \"string\",",
+									"          \"description\": \"Ссылка на фото для аватара пользователя\",",
+									"          \"maxLength\": 200",
+									"        }",
+									"      },",
+									"      \"required\": [",
+									"        \"login\",",
+									"        \"email\",",
+									"        \"countryCode\",",
+									"        \"isPublic\"",
+									"      ]",
+									"    }",
+									"  },",
+									"  \"required\": [",
+									"    \"profile\"",
+									"  ],",
+									"  \"$schema\": \"http://json-schema.org/draft-04/schema#\"",
+									"};",
+									"",
+									"pm.test(\"Register a user\", function () {",
+									"    var url = pm.variables.get(\"base_url\") + \"/auth/register\";",
+									"    const options = {",
+									"        url: url,",
+									"        method: 'POST',",
+									"        header: {",
+									"            'Content-Type': 'application/json',",
+									"        },",
+									"        body: {",
+									"            mode: 'raw',",
+									"            raw: JSON.stringify({",
+									"                'login': 'yellowMonkey10000',",
+									"                'email': 'yellowstone1980@you.ru',",
+									"                'password': '$aba4821FWfew01#.fewA$',",
+									"                'countryCode': 'RU',",
+									"                'isPublic': true,",
+									"                'phone': '+74951239922',",
+									"            })",
+									"        }",
+									"    };",
+									"",
+									"    const profile = {",
+									"        'profile': {",
+									"            'login': 'yellowMonkey10000',",
+									"            'email': 'yellowstone1980@you.ru',",
+									"            'countryCode': 'RU',",
+									"            'isPublic': true,",
+									"            'phone': '+74951239922',",
+									"        }",
+									"    }",
+									"",
+									"    pm.sendRequest(options, function (err, response) {",
+									"        pm.test(\"Validate response\", () => {",
+									"            var resp = response.json();",
+									"        ",
+									"            pm.expect(response.code).to.be.oneOf([201, 409], \"Invalid response code status\");",
+									"        });",
+									"    });",
+									"});",
+									"",
+									"",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Sign in",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var schema = {",
+									"  \"type\": \"object\",",
+									"  \"properties\": {",
+									"    \"token\": {",
+									"        \"type\": \"string\",",
+									"        \"description\": \"Сгенерированный токен пользователя\",",
+									"        \"minLength\": 20,",
+									"    }",
+									"  },",
+									"  \"required\": [",
+									"    \"token\"",
+									"  ],",
+									"  \"$schema\": \"http://json-schema.org/draft-04/schema#\"",
+									"};",
+									"",
+									"pm.test(\"Sign in\", function () {",
+									"    var url = pm.variables.get(\"base_url\") + \"/auth/sign-in\";",
+									"    var options = {",
+									"        url: url,",
+									"        method: 'POST',",
+									"        header: {",
+									"            'Content-Type': 'application/json',",
+									"        },",
+									"        body: {",
+									"            mode: 'raw',",
+									"            raw: JSON.stringify({",
+									"                'login': 'yellowMonkey10000',",
+									"                'password': '$aba4821FWfew01#.fewA$',",
+									"            })",
+									"        }",
+									"    };",
+									"    ",
+									"    pm.sendRequest(options, function (err, response) {",
+									"        pm.test(\"Validate sign-in response\", () => {",
+									"            var resp = response.json();",
+									"",
+									"            pm.expect(response.code).to.be.eq(200, \"Invalid response code status\");",
+									"            pm.expect(tv4.validate(resp, schema), \"Invalid JSON schema\").to.be.true;",
+									"",
+									"            pm.environment.set(\"05_profile_token\", resp.token);",
+									"            console.log(\"Token has been saved\")",
+									"        });",
+									"    });",
+									"});",
+									"",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get my profile",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Get profile\", function () {",
+									"    const url = pm.variables.get(\"base_url\") + \"/me/profile\";",
+									"    const token = pm.environment.get(\"05_profile_token\");",
+									"    const options = {",
+									"        url: url,",
+									"        method: 'GET',",
+									"        header: {",
+									"            'Content-Type': 'application/json',",
+									"            'Authorization': `Bearer ${token}`,",
+									"        },",
+									"    };",
+									"",
+									"    pm.sendRequest(options, function (err, response) {",
+									"        pm.test(\"Validate profile\", () => {",
+									"            var resp = response.json();",
+									"",
+									"            pm.expect(response.code).to.be.eq(200, \"Invalid response code status\");",
+									"",
+									"            console.log(\"Got profile\", resp);",
+									"            pm.expect(resp.login).to.be.eq(\"yellowMonkey10000\", \"Invalid login\");",
+									"        });",
+									"    });",
+									"});",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:57424/api",
+			"type": "default"
+		}
+	]
+}
