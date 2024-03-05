@@ -1,10 +1,17 @@
 name: Run tests
 
-on: deployment
+on:
+  push:
+    branches:
+      - main
+  pull-request:
+    branches:
+      - main
 
 permissions:
   contents: read
   packages: write
+
 
 jobs:
   build:
@@ -39,7 +46,6 @@ jobs:
     runs-on: ubuntu-22.04
     needs: build
     timeout-minutes: 10
-    if: github.actor != 'github-classroom[bot]'
     steps:
       - uses: Central-University-IT/setup-test-backend@v1
 
