@@ -38,11 +38,11 @@ async def validation_exception_handler(_: Request, exc: ValidationException):
     return JSONResponse(status_code=422, content=ErrorResponse(reason=exc.errors()).dict())
 
 
-print(os.environ)
-url = f"postgresql+asyncpg://{Config.POSTGRES_USER}:{Config.POSTGRES_PASSWORD}@{Config.POSTGRES_HOST}:{Config.POSTGRES_PORT}/{Config.POSTGRES_DATABASE}" if not Config.POSTGRES_CONN else Config.POSTGRES_CONN
+# print(os.environ)
+# url = f"postgresql+asyncpg://{Config.POSTGRES_USER}:{Config.POSTGRES_PASSWORD}@{Config.POSTGRES_HOST}:{Config.POSTGRES_PORT}/{Config.POSTGRES_DATABASE}" if not Config.POSTGRES_CONN else Config.POSTGRES_CONN
 
-engine = create_async_engine(url=url, echo=False, future=True)
-db_pool = async_sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
+# engine = create_async_engine(url=url, echo=False, future=True)
+# db_pool = async_sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
 
 
 async def create_all_tables():
